@@ -5,7 +5,7 @@ import App from './App';
 import axios from 'axios';
 
 // Axios base URL'ini ayarla
-axios.defaults.baseURL = 'http://localhost:8080';
+axios.defaults.baseURL = '/api';
 
 // Axios default header'larını ayarla
 axios.defaults.headers.common['Content-Type'] = 'application/json';
