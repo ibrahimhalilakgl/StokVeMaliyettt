@@ -81,7 +81,7 @@ const YemekReceteleri: React.FC = () => {
   const fetchYemekReceteleri = async () => {
     try {
       setLoading(true);
-      const response = await axios.get<{ data: YemekRecetesi[] }>('http://localhost:8080/v1/yemek-recetesi/all', {
+      const response = await axios.get<{ data: YemekRecetesi[] }>('/v1/yemek-recetesi/all', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setYemekReceteleri(response.data.data);
@@ -94,7 +94,7 @@ const YemekReceteleri: React.FC = () => {
 
   const fetchGunlukMenuler = async () => {
     try {
-      const response = await axios.get<{ data: GunlukMenu[] }>('http://localhost:8080/v1/gunluk-menu/all', {
+      const response = await axios.get<{ data: GunlukMenu[] }>('/v1/gunluk-menu/all', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setGunlukMenuler(response.data.data);
@@ -116,12 +116,12 @@ const YemekReceteleri: React.FC = () => {
       };
 
       if (editingRecete) {
-        await axios.put(`http://localhost:8080/v1/yemek-recetesi/update/${editingRecete.id}`, requestData, {
+        await axios.put(`/v1/yemek-recetesi/update/${editingRecete.id}`, requestData, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setSuccess('Yemek reçetesi başarıyla güncellendi');
       } else {
-        await axios.post('http://localhost:8080/v1/yemek-recetesi/create', requestData, {
+        await axios.post('/v1/yemek-recetesi/create', requestData, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setSuccess('Yemek reçetesi başarıyla oluşturuldu');
@@ -148,12 +148,12 @@ const YemekReceteleri: React.FC = () => {
       };
 
       if (editingMenu) {
-        await axios.put(`http://localhost:8080/v1/gunluk-menu/update/${editingMenu.id}`, requestData, {
+        await axios.put(`/v1/gunluk-menu/update/${editingMenu.id}`, requestData, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setSuccess('Günlük menü başarıyla güncellendi');
       } else {
-        await axios.post('http://localhost:8080/v1/gunluk-menu/create', requestData, {
+        await axios.post('/v1/gunluk-menu/create', requestData, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setSuccess('Günlük menü başarıyla oluşturuldu');
@@ -174,7 +174,7 @@ const YemekReceteleri: React.FC = () => {
     }
 
     try {
-      await axios.delete(`http://localhost:8080/v1/yemek-recetesi/delete/${id}`, {
+      await axios.delete(`/v1/yemek-recetesi/delete/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSuccess('Yemek reçetesi başarıyla silindi');
@@ -190,7 +190,7 @@ const YemekReceteleri: React.FC = () => {
     }
 
     try {
-      await axios.delete(`http://localhost:8080/v1/gunluk-menu/delete/${id}`, {
+      await axios.delete(`/v1/gunluk-menu/delete/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSuccess('Günlük menü başarıyla silindi');
@@ -235,7 +235,7 @@ const YemekReceteleri: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await axios.get<{ data: any }>(`http://localhost:8080/v1/gunluk-menu/rapor/${yil}`, {
+      const response = await axios.get<{ data: any }>(`/v1/gunluk-menu/rapor/${yil}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setRaporData(response.data.data);

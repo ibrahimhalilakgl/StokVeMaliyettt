@@ -57,7 +57,7 @@ const StokDurumu: React.FC = () => {
         localStorage.getItem('authToken') ||
         sessionStorage.getItem('token') || '';
 
-      const response = await axios.get('http://localhost:8080/v1/materialEntry/details', {
+      const response = await axios.get('/v1/materialEntry/details', {
         headers: { Authorization: `Bearer ${token}` }
       });
       const stockData = response.data.data || [];

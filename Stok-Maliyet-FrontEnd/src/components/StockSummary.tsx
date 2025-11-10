@@ -45,7 +45,7 @@ const DepotTable: React.FC = () => {
     localStorage.getItem('authToken') ||
     sessionStorage.getItem('token') || '';
 
-  axios.get<{ data: DepotItem[] }>('http://localhost:8080/v1/materialEntry/details', {
+  axios.get<{ data: DepotItem[] }>('/v1/materialEntry/details', {
     headers: { Authorization: `Bearer ${token}` }
   })
     .then(response => {

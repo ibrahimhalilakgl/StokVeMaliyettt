@@ -118,7 +118,7 @@ const DailyStockExitForm: React.FC = () => {
         const response = await axios.get<{
           data: any;
           success: boolean;
-        }>('http://localhost:8080/v1/gunluk-menu/bugun', {
+        }>('/v1/gunluk-menu/bugun', {
           headers: { Authorization: `Bearer ${token}` }
         });
         
