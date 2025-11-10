@@ -279,7 +279,7 @@ const WeeklyMaterialRequest = () => {
           tenderId: Number(demand.tenderId),
           productId: demand.productId,
           quantity: demand.quantity,
-          userName: demand.userName,
+          userName: '',
           requestDate: demand.requestDate,
           directProcurementId: null
         });
@@ -291,7 +291,7 @@ const WeeklyMaterialRequest = () => {
           directProcurementId: Number(demand.directProcurementId),
           productId: demand.productId,
           quantity: demand.quantity,
-          userName: demand.userName,
+          userName: '',
           requestDate: demand.requestDate,
           tenderId: null
         });
@@ -478,14 +478,7 @@ const WeeklyMaterialRequest = () => {
           </TableContainer>
 
           <Grid container spacing={2} sx={{ mt: 3 }}>
-            <Grid item xs={6}>
-              <TextField
-                fullWidth
-                label="Talep Eden"
-                defaultValue=""
-              />
-            </Grid>
-            <Grid item xs={6}>
+            <Grid item xs={12}>
               <TextField
                 fullWidth
                 label="Onaylayan"
@@ -533,12 +526,6 @@ const WeeklyMaterialRequest = () => {
             type="number" 
             InputProps={{ inputProps: { min: 0 } }}
           />
-          <TextField 
-            label="Talep Eden" 
-            name="userName" 
-            value={formData.userName} 
-            onChange={handleChange} 
-          />
           <TextField
             label="Talep Tarihi"
             name="requestDate"
@@ -585,12 +572,6 @@ const WeeklyMaterialRequest = () => {
             onChange={handleChange} 
             type="number" 
             InputProps={{ inputProps: { min: 0 } }}
-          />
-          <TextField 
-            label="Talep Eden" 
-            name="userName" 
-            value={formData.userName} 
-            onChange={handleChange} 
           />
           <TextField
             label="Talep Tarihi"
