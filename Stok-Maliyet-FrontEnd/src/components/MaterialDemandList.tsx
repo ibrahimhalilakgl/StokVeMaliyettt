@@ -17,12 +17,17 @@ interface Demand {
   productId: number;
   rejectionReason: string;
   demandStatus: 'PENDING' | 'APPROVED' | 'REJECTED';
+  tenderType?: 'DIRECT_PROCUREMENT' | 'OPEN_TENDER'; // Doğrudan temin mi ihale mi
 }
 
 interface Budget {
   id: number;
-
   budgetName: string;
+}
+
+interface PurchaseType {
+  id: number;
+  name: string;
 }
 
 const MaterialDemandList: React.FC = () => {
@@ -31,12 +36,14 @@ const MaterialDemandList: React.FC = () => {
   const [openApproveDialog, setOpenApproveDialog] = useState(false);
   const [openRejectDialog, setOpenRejectDialog] = useState(false);
   const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [purchaseTypes, setPurchaseTypes] = useState<PurchaseType[]>([]);
   const [approveForm, setApproveForm] = useState({
     budgetId: '',
     description: '',
     expiryDate: '',
     entryDate: '',
-    quantity: ''
+    quantity: '',
+    purchaseTypeId: ''
   });
   const [rejectForm, setRejectForm] = useState({
     rejectionReason: ''
@@ -50,6 +57,10 @@ const MaterialDemandList: React.FC = () => {
     axios.get('/v1/budget/all')
       .then(res => setBudgets(res.data.data))
       .catch(err => console.error(err));
+
+    axios.get('/v1/purchaseType/all')
+      .then(res => setPurchaseTypes(res.data.data || []))
+      .catch(err => console.error(err));
   }, []);
   console.log(budgets)
 
@@ -60,7 +71,8 @@ const MaterialDemandList: React.FC = () => {
       description: '',
       expiryDate: '',
       entryDate: '',
-      quantity: demand.quantity.toString() // Talep edilen miktarı varsayılan olarak göster
+      quantity: demand.quantity.toString(), // Talep edilen miktarı varsayılan olarak göster
+      purchaseTypeId: ''
     });
     setOpenApproveDialog(true);
   };
@@ -80,20 +92,33 @@ const MaterialDemandList: React.FC = () => {
       return;
     }
 
-    axios.post('/v1/materialDemand/approve', {
+    // Doğrudan temin için purchaseTypeId kontrolü
+    if (selectedDemand.tenderType === 'DIRECT_PROCUREMENT' && !approveForm.purchaseTypeId) {
+      alert('Doğrudan temin için Alım Türü seçilmelidir!');
+      return;
+    }
+
+    const requestBody: any = {
       materialDemandId: selectedDemand.id,
       budgetId: approveForm.budgetId,
       description: approveForm.description,
       expiryDate: approveForm.expiryDate,
       entryDate: approveForm.entryDate,
       quantity: quantity
-    }).then(() => {
+    };
+
+    // Sadece doğrudan temin için purchaseTypeId ekle
+    if (selectedDemand.tenderType === 'DIRECT_PROCUREMENT' && approveForm.purchaseTypeId) {
+      requestBody.purchaseTypeId = approveForm.purchaseTypeId;
+    }
+
+    axios.post('/v1/materialDemand/approve', requestBody).then(() => {
       // Listeyi yeniden yükle
       axios.get('/v1/materialDemand/all')
         .then(res => setDemands(res.data.data))
         .catch(err => console.error(err));
       setOpenApproveDialog(false);
-      setApproveForm({ budgetId: '', description: '', expiryDate: '', entryDate: '', quantity: '' });
+      setApproveForm({ budgetId: '', description: '', expiryDate: '', entryDate: '', quantity: '', purchaseTypeId: '' });
       setSelectedDemand(null);
     }).catch((error) => {
       console.error("Onay işlemi sırasında hata:", error);
@@ -342,6 +367,24 @@ const MaterialDemandList: React.FC = () => {
                 <MenuItem disabled>Yükleniyor...</MenuItem>
             )}
             </TextField>
+            {selectedDemand?.tenderType === 'DIRECT_PROCUREMENT' && (
+              <TextField
+                select
+                label="Alım Türü"
+                value={approveForm.purchaseTypeId}
+                onChange={(e) => setApproveForm({ ...approveForm, purchaseTypeId: e.target.value })}
+                fullWidth
+                required
+              >
+                {purchaseTypes && purchaseTypes.length > 0 ? (
+                  purchaseTypes.map(pt => (
+                    <MenuItem key={pt.id} value={pt.id}>{pt.name}</MenuItem>
+                  ))
+                ) : (
+                  <MenuItem disabled>Yükleniyor...</MenuItem>
+                )}
+              </TextField>
+            )}
             <TextField
             label="Açıklama"
             required
@@ -380,7 +423,7 @@ const MaterialDemandList: React.FC = () => {
         <DialogActions sx={{ px: 3, pb: 2 }}>
             <Button onClick={() => {
               setOpenApproveDialog(false);
-              setApproveForm({ budgetId: '', description: '', expiryDate: '', entryDate: '', quantity: '' });
+              setApproveForm({ budgetId: '', description: '', expiryDate: '', entryDate: '', quantity: '', purchaseTypeId: '' });
               setSelectedDemand(null);
             }} color="inherit">İptal</Button>
             <Button onClick={handleApproveSubmit} variant="contained" color="success">Onayla</Button>

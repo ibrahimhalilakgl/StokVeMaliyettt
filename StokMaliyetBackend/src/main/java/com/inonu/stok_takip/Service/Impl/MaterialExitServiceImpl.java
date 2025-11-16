@@ -2,9 +2,12 @@ package com.inonu.stok_takip.Service.Impl;
 
 import com.inonu.stok_takip.Exception.MaterialExit.InsufficientStockException;
 import com.inonu.stok_takip.Exception.MaterialExit.MaterialExitNotFoundException;
+import com.inonu.stok_takip.Exception.Report.ReportDataNotFoundException;
 import com.inonu.stok_takip.Repositoriy.MaterialExitRepository;
 import com.inonu.stok_takip.Service.MaterialEntryService;
 import com.inonu.stok_takip.Service.MaterialExitService;
+import com.inonu.stok_takip.Service.ReportService;
+import com.inonu.stok_takip.Service.TicketSalesDetailService;
 import com.inonu.stok_takip.dto.Request.DateRequest;
 import com.inonu.stok_takip.dto.Request.MaterialExitCreateRequest;
 import com.inonu.stok_takip.dto.Response.MaterialExitDetailResponse;
@@ -13,8 +16,11 @@ import com.inonu.stok_takip.dto.Response.ProductDetailResponse;
 import com.inonu.stok_takip.entitiy.MaterialEntry;
 import com.inonu.stok_takip.entitiy.MaterialExit;
 import com.inonu.stok_takip.entitiy.Product;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionSynchronization;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -29,11 +35,17 @@ public class MaterialExitServiceImpl implements MaterialExitService {
 
     private final MaterialExitRepository materialExitRepository;
     private final MaterialEntryService materialEntryService;
+    private final ReportService reportService;
+    private final TicketSalesDetailService ticketSalesDetailService;
 
     public MaterialExitServiceImpl(MaterialExitRepository materialExitRepository,
-                                   MaterialEntryService materialEntryService) {
+                                   MaterialEntryService materialEntryService,
+                                   @Lazy ReportService reportService,
+                                   @Lazy TicketSalesDetailService ticketSalesDetailService) {
         this.materialExitRepository = materialExitRepository;
         this.materialEntryService = materialEntryService;
+        this.reportService = reportService;
+        this.ticketSalesDetailService = ticketSalesDetailService;
     }
 
     @Override
@@ -54,7 +66,70 @@ public class MaterialExitServiceImpl implements MaterialExitService {
             responses.add(mapToResponse(materialExit));
         }
 
+        // Tüm MaterialExit kayıtları kaydedildikten sonra flush yap
+        // Böylece transaction commit edildiğinde veriler görünür olur
+        materialExitRepository.flush();
+
+        // Transaction commit edildikten sonra rapor güncellemesi yapılacak
+        // Bu işlem transaction commit edildikten sonra çalışacak
+        LocalDate exitDate = request.exitDate();
+        scheduleReportUpdateAfterCommit(exitDate);
+
         return responses;
+    }
+
+    // Transaction commit edildikten sonra rapor güncellemesi yapmak için
+    // TransactionSynchronizationManager kullanarak commit sonrası callback kaydeder
+    private void scheduleReportUpdateAfterCommit(LocalDate exitDate) {
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    updateReportAfterExit(exitDate);
+                }
+            });
+        } else {
+            // Eğer transaction yoksa direkt çağır
+            updateReportAfterExit(exitDate);
+        }
+    }
+
+    // Transaction dışında çalışan, rapor güncelleme metodu
+    // Bu metod exitMaterials transaction'ı commit edildikten sonra çağrılır
+    private void updateReportAfterExit(LocalDate exitDate) {
+        try {
+            // Eğer o gün için fiş kaydı varsa, raporu mutlaka oluştur/güncelle
+            // Her çıkış yapıldığında rapor güncellenmeli
+            Integer ticketQuantity = ticketSalesDetailService.getTicketCountByDay(exitDate);
+            Integer totalPerson = ticketSalesDetailService.getTotalPersonByDay(exitDate);
+            boolean hasTicketData = (ticketQuantity != null && ticketQuantity > 0) || 
+                                   (totalPerson != null && totalPerson > 0);
+            
+            if (hasTicketData) {
+                // O gün için fiş kaydı varsa, raporu mutlaka oluştur/güncelle
+                try {
+                    reportService.calculateDailyReport(exitDate);
+                } catch (Exception e) {
+                    // Rapor oluşturma hatası malzeme çıkışını etkilemez, sadece logla
+                    System.err.println("Rapor güncellenirken hata (fiş kaydı var): " + e.getMessage());
+                    e.printStackTrace();
+                }
+            } else {
+                // Fiş kaydı yoksa, sadece malzeme çıkışı varsa rapor oluştur
+                try {
+                    reportService.calculateDailyReport(exitDate);
+                } catch (ReportDataNotFoundException e) {
+                    // Veri yeterli değilse rapor oluşturulmaz, normal durum
+                } catch (Exception e) {
+                    System.err.println("Rapor oluşturulurken hata: " + e.getMessage());
+                    e.printStackTrace();
+                }
+            }
+        } catch (Exception e) {
+            // Rapor oluşturma hatası malzeme çıkışını etkilemez, sadece logla
+            System.err.println("Rapor otomatik oluşturulurken hata: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     private MaterialExit createExitForSingleProduct(Long productId, Double quantity, MaterialExitCreateRequest request) {
@@ -113,7 +188,6 @@ public class MaterialExitServiceImpl implements MaterialExitService {
         materialExit.setTotalPrice(totalPrice);
         materialExit.setExitDate(request.exitDate());
         materialExit.setRecipient(request.recipient());
-        materialExit.setTotalPerson(request.totalPerson());
         materialExit.setDescription(request.description());
         return materialExit;
     }

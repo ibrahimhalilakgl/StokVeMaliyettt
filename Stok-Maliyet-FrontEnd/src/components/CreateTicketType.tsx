@@ -65,8 +65,9 @@ const TicketTypeList: React.FC = () => {
       alert('Fiş türü adı boş olamaz!');
       return;
     }
-    if (!newType.unitPrice || parseFloat(newType.unitPrice) <= 0) {
-      alert('Birim fiyat 0\'dan büyük olmalıdır!');
+    const unitPriceValue = parseFloat(newType.unitPrice);
+    if (newType.unitPrice === '' || newType.unitPrice === null || isNaN(unitPriceValue) || unitPriceValue < 0) {
+      alert('Birim fiyat 0 veya 0\'dan büyük olmalıdır!');
       return;
     }
 
@@ -103,8 +104,8 @@ const TicketTypeList: React.FC = () => {
       alert('Fiş türü adı boş olamaz!');
       return;
     }
-    if (!editType.unitPrice || editType.unitPrice <= 0) {
-      alert('Birim fiyat 0\'dan büyük olmalıdır!');
+    if (editType.unitPrice === null || editType.unitPrice === undefined || editType.unitPrice < 0) {
+      alert('Birim fiyat 0 veya 0\'dan büyük olmalıdır!');
       return;
     }
 
@@ -223,7 +224,7 @@ const TicketTypeList: React.FC = () => {
             required
             fullWidth
             inputProps={{ min: 0, step: 0.01 }}
-            helperText="Fiş türü birim fiyatını girin (TL)"
+            helperText="Fiş türü birim fiyatını girin (TL). Ücretsiz fiş için 0 girebilirsiniz."
           />
         </DialogContent>
         <DialogActions>

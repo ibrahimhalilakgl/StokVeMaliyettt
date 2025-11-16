@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Box, Grid, Paper, Typography, Table, TableBody, TableCell,Chip,
   TableContainer, TableHead, TableRow, Card, CardContent, Button
@@ -101,7 +101,8 @@ const AdminHomePage: React.FC = () => {
   const [ticketReport, setTicketReport] = useState<any[]>([]);
   const [yesterdayDate, setYesterdayDate] = useState<Date>(new Date());
 
-  const [lastValidTicketReport, setLastValidTicketReport] = useState<any[]>([]);
+  // useRef kullanarak sonsuz döngüyü önle
+  const lastValidTicketReportRef = useRef<any[]>([]);
 
   // Sayfa başına gösterilecek ürün sayısı
   const itemsPerPage = 8;
@@ -219,17 +220,17 @@ const handleCategoryClick = (formName: string) => {
     .then((res) => {
       if (res.data.data.length > 0) {
         setTicketReport(res.data.data);
-        setLastValidTicketReport(res.data.data);
+        lastValidTicketReportRef.current = res.data.data; // Ref'e kaydet
       } else {
         // Eğer veri yoksa son geçerli veriyi kullan
-        setTicketReport(lastValidTicketReport);
+        setTicketReport(lastValidTicketReportRef.current);
       }
     })
     .catch((err) => {
       console.error("Fiş raporu alınamadı:", err);
-      setTicketReport(lastValidTicketReport); // Hata durumunda da son geçerli veri
+      setTicketReport(lastValidTicketReportRef.current); // Hata durumunda da son geçerli veri
     });
-}, [lastValidTicketReport]);
+}, []); // Boş dependency array - sadece component mount olduğunda çalışır
 
 
   const StatBox = ({ title, value, icon, color }: { title: string, value: string, icon: React.ReactNode, color: string }) => (

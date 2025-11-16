@@ -1,7 +1,10 @@
 package com.inonu.stok_takip.Service.Impl;
 
+import com.inonu.stok_takip.Enum.ReportType;
+import com.inonu.stok_takip.Exception.Report.ReportDataNotFoundException;
 import com.inonu.stok_takip.Exception.TicketSalesDetails.TicketDetailsNotFoundException;
 import com.inonu.stok_takip.Repositoriy.TicketSalesDetailRepository;
+import com.inonu.stok_takip.Service.ReportService;
 import com.inonu.stok_takip.Service.TicketSalesDetailService;
 import com.inonu.stok_takip.Service.TicketTypeService;
 import com.inonu.stok_takip.dto.Request.DateRequest;
@@ -10,6 +13,7 @@ import com.inonu.stok_takip.dto.Response.TicketSalesDetailResponse;
 import com.inonu.stok_takip.dto.Response.TicketSalesResponse;
 import com.inonu.stok_takip.entitiy.TicketSalesDetail;
 import com.inonu.stok_takip.entitiy.TicketType;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -24,11 +28,14 @@ public class TicketSalesDetailServiceImpl implements TicketSalesDetailService {
 
     private final TicketSalesDetailRepository ticketSalesDetailRepository;
     private final TicketTypeService ticketTypeService;
+    private final ReportService reportService;
 
     public TicketSalesDetailServiceImpl(TicketSalesDetailRepository ticketSalesDetailRepository,
-                                        TicketTypeService ticketTypeService) {
+                                        TicketTypeService ticketTypeService,
+                                        @Lazy ReportService reportService) {
         this.ticketSalesDetailRepository = ticketSalesDetailRepository;
         this.ticketTypeService = ticketTypeService;
+        this.reportService = reportService;
     }
 
 
@@ -56,6 +63,7 @@ public class TicketSalesDetailServiceImpl implements TicketSalesDetailService {
             ticketSalesDetail.setTotalPrice(ticketType.getUnitPrice() * quantity);
             ticketSalesDetail.setTicketDate(request.ticketDate());
             ticketSalesDetail.setTicketType(ticketType);
+            ticketSalesDetail.setTotalPerson(request.totalPerson()); // o gün için kaç kişilik yemek yapıldığı
 
             ticketSalesDetailRepository.save(ticketSalesDetail);
             ticketSalesDetails.add(ticketSalesDetail);
@@ -63,8 +71,22 @@ public class TicketSalesDetailServiceImpl implements TicketSalesDetailService {
             totalAmount += ticketSalesDetail.getTotalPrice();
         }
 
-        //TicketSalesDetailResponse response = new TicketSalesDetailResponse();
-        //response.setTotalPrice(totalAmount);
+        // Tüm fiş kayıtları kaydedildikten sonra flush yap
+        ticketSalesDetailRepository.flush();
+
+        // Fiş kaydı yapıldıktan sonra, o tarih için raporu güncelle veya oluştur
+        try {
+            LocalDate ticketDate = request.ticketDate();
+            // Raporu güncelle veya oluştur (veri yeterli değilse exception fırlatır, sessizce geç)
+            try {
+                reportService.calculateDailyReport(ticketDate);
+            } catch (ReportDataNotFoundException e) {
+                // Veri yeterli değilse rapor oluşturulmaz, normal durum
+            }
+        } catch (Exception e) {
+            // Rapor oluşturma hatası fiş kaydını etkilemez, sadece logla
+            System.err.println("Rapor otomatik oluşturulurken hata: " + e.getMessage());
+        }
 
         return mapToResponseList(ticketSalesDetails);
     }
@@ -190,6 +212,35 @@ public class TicketSalesDetailServiceImpl implements TicketSalesDetailService {
             return null;
         }
         return ticketCount;
+    }
+
+    @Override
+    public void deleteTicketsByDate(LocalDate ticketDate) {
+        // Önce o tarih için raporu güncelle veya sil
+        try {
+            // Raporu güncelle (fiş kayıtları silindikten sonra)
+            ticketSalesDetailRepository.deleteByTicketDate(ticketDate);
+            ticketSalesDetailRepository.flush();
+            
+            // Raporu güncelle veya oluştur
+            try {
+                reportService.calculateDailyReport(ticketDate);
+            } catch (ReportDataNotFoundException e) {
+                // Veri yeterli değilse rapor oluşturulmaz, normal durum
+            }
+        } catch (Exception e) {
+            System.err.println("Fiş kayıtları silinirken hata: " + e.getMessage());
+            throw e;
+        }
+    }
+
+    @Override
+    public Integer getTotalPersonByDay(LocalDate dayDate) {
+        Integer totalPerson = ticketSalesDetailRepository.findTotalPersonByDate(dayDate);
+        if (totalPerson == null) {
+            return 0;
+        }
+        return totalPerson;
     }
 
     private TicketSalesDetailResponse mapToResponse (TicketSalesDetail ticketSalesDetail) {

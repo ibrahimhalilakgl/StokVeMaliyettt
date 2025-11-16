@@ -10,6 +10,8 @@ import com.inonu.stok_takip.dto.Response.ReportResponse;
 import com.inonu.stok_takip.entitiy.Report;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -52,240 +54,216 @@ public class ReportServiceImpl implements ReportService {
 
     @Override
     public List<ReportResponse> getAllReports() {
-        List<Report> reports = reportRepository.findAll();
+        // Sadece günlük raporları getir
+        List<Report> reports = reportRepository.findByReportType(ReportType.DAILY);
         return mapToResponseList(reports);
     }
 
     @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public ReportResponse calculateDailyReport(LocalDate date) {
-        Integer totalPerson = materialExitService.numberMealsInDay(date);
+        // totalPerson artık TicketSalesDetail'den alınıyor, MaterialExit'ten değil
+        Integer totalPerson = ticketSalesDetailService.getTotalPersonByDay(date);
         Integer ticketQuantity = ticketSalesDetailService.getTicketCountByDay(date);
         Double totalAmount = materialExitService.getNonCleaningMaterialExitsByDate(date);
         Double totalTicketAmount = ticketSalesDetailService.getTicketAmountByDay(date);
 
-        if (totalPerson == null || totalPerson == 0) {
-            throw new ReportDataNotFoundException("Daily Report Error: Total person is null or zero for date " + date);
-        }
-        if (ticketQuantity == null || ticketQuantity == 0) {
-            throw new ReportDataNotFoundException("Daily Report Error: Ticket quantity is null or zero for date " + date);
-        }
-        if (totalAmount == null || totalAmount == 0) {
-            throw new ReportDataNotFoundException("Daily Report Error: Total amount is null or zero for date " + date);
+        // Rapor için gerekli verilerden en az 1'i geldiğinde hesaplansın
+        boolean hasData = (totalPerson != null && totalPerson > 0) || 
+                         (ticketQuantity != null && ticketQuantity > 0) || 
+                         (totalAmount != null && totalAmount > 0);
+
+        if (!hasData) {
+            throw new ReportDataNotFoundException("Daily Report Error: No data available for date " + date);
         }
 
-        Double personCost = totalAmount / totalPerson;
-        Double ticketCost = totalAmount / ticketQuantity;
-        int leftoverMealCount = totalPerson - ticketQuantity;
+        // Null değerleri 0 olarak kabul et
+        int safeTotalPerson = (totalPerson != null) ? totalPerson : 0;
+        int safeTicketQuantity = (ticketQuantity != null) ? ticketQuantity : 0;
+        double safeTotalAmount = (totalAmount != null) ? totalAmount : 0.0;
+        double safeTotalTicketAmount = (totalTicketAmount != null) ? totalTicketAmount : 0.0;
 
-        Report report = new Report();
+        // Hesaplamalar - sıfıra bölme kontrolü
+        Double personCost = (safeTotalPerson > 0) ? safeTotalAmount / safeTotalPerson : 0.0;
+        Double ticketCost = (safeTicketQuantity > 0) ? safeTotalAmount / safeTicketQuantity : 0.0;
+        int leftoverMealCount = safeTotalPerson - safeTicketQuantity;
+
+        // Mevcut raporu kontrol et, varsa güncelle, yoksa yeni oluştur
+        Report report = reportRepository.findByReportCreateDateAndReportType(date, ReportType.DAILY)
+                .orElse(new Report());
+
         report.setReportType(ReportType.DAILY);
-        report.setTicketQuantity(ticketQuantity);
-        report.setReportCreateDate(LocalDate.now());
-        report.setTotalPersonQuantity(totalPerson);
-        report.setTotalMaterialPrice(totalAmount);
+        report.setTicketQuantity(safeTicketQuantity);
+        report.setReportCreateDate(date); // Rapor tarihi, oluşturulma tarihi değil
+        report.setTotalPersonQuantity(safeTotalPerson);
+        report.setTotalMaterialPrice(safeTotalAmount);
         report.setTotalCleanPrice(0.0);
         report.setAveragePersonCost(personCost);
         report.setAverageTicketCost(ticketCost);
         report.setLeftoverMealCount(leftoverMealCount);
-        report.setTotalTicketPrice(totalTicketAmount);
+        report.setTotalTicketPrice(safeTotalTicketAmount);
 
+        // Sadece günlük raporlar veritabanına kaydedilir
         Report savedReport = reportRepository.save(report);
         return mapToResponse(savedReport);
     }
     
     @Override
     public ReportResponse calculateWeeklyReport(LocalDate date){
-
+        // Haftalık rapor sadece hesaplanır, veritabanına kaydedilmez
+        // Frontend'de günlük raporlardan hesaplanacak
         Integer totalPerson = materialExitService.numberMealsInWeek(date);
         Integer ticketCount = ticketSalesDetailService.getTicketCountByWeek(date);
         Double totalMaterialPrice = materialExitService.getMaterialsByWeek(date);
         Double totalTicketPrice = ticketSalesDetailService.getTicketAmountByWeek(date);
 
-        if (totalPerson == null || totalPerson == 0) {
-            throw new ReportDataNotFoundException("Weekly Report Error: Total person is null or zero for week of date " + date);
-        }
-        if (ticketCount == null || ticketCount == 0) {
-            throw new ReportDataNotFoundException("Weekly Report Error: Ticket quantity is null or zero for week of date " + date);
-        }
-        if (totalMaterialPrice == null || totalMaterialPrice == 0) {
-            throw new ReportDataNotFoundException("Weekly Report Error: Total amount is null or zero for week of date " + date);
-        }
-        Double personCost = totalMaterialPrice / totalPerson;
-        Double ticketCost = totalMaterialPrice / ticketCount;
-        int leftoverMealCount = totalPerson - ticketCount;
+        // Null değerleri 0 olarak kabul et
+        int safeTotalPerson = (totalPerson != null) ? totalPerson : 0;
+        int safeTicketCount = (ticketCount != null) ? ticketCount : 0;
+        double safeTotalMaterialPrice = (totalMaterialPrice != null) ? totalMaterialPrice : 0.0;
+        double safeTotalTicketPrice = (totalTicketPrice != null) ? totalTicketPrice : 0.0;
 
+        // Hesaplamalar - sıfıra bölme kontrolü
+        Double personCost = (safeTotalPerson > 0) ? safeTotalMaterialPrice / safeTotalPerson : 0.0;
+        Double ticketCost = (safeTicketCount > 0) ? safeTotalMaterialPrice / safeTicketCount : 0.0;
+        int leftoverMealCount = safeTotalPerson - safeTicketCount;
 
+        // Rapor oluştur ama veritabanına kaydetme
         Report report = new Report();
         report.setReportType(ReportType.WEEKLY);
-        report.setTicketQuantity(ticketCount);
-        report.setReportCreateDate(LocalDate.now());
-        report.setTotalPersonQuantity(totalPerson);
-        report.setTotalMaterialPrice(totalMaterialPrice);
+        report.setTicketQuantity(safeTicketCount);
+        report.setReportCreateDate(date);
+        report.setTotalPersonQuantity(safeTotalPerson);
+        report.setTotalMaterialPrice(safeTotalMaterialPrice);
         report.setTotalCleanPrice(0.0);
         report.setLeftoverMealCount(leftoverMealCount);
         report.setAveragePersonCost(personCost);
         report.setAverageTicketCost(ticketCost);
-        report.setTotalTicketPrice(totalTicketPrice);
-        Report savedReport = reportRepository.save(report);
+        report.setTotalTicketPrice(safeTotalTicketPrice);
 
-
-        return mapToResponse(savedReport);
+        // Veritabanına kaydetmeden response döndür
+        return mapToResponse(report);
     }
 
     @Override
     public ReportResponse calculateMonthlyReport(LocalDate date){
+        // Aylık rapor sadece hesaplanır, veritabanına kaydedilmez
+        // Frontend'de günlük raporlardan hesaplanacak
         Integer totalPerson = materialExitService.numberMealsInMonth(date);
         Integer ticketCount = ticketSalesDetailService.getTicketCountByMonth(date);
         Double totalMaterialPrice = materialExitService.getMaterialsByMonthAndYear(date);
         Double totalTicketPrice = ticketSalesDetailService.getTicketAmountByMonth(date);
 
-        if (totalPerson == null || totalPerson == 0) {
-            throw new ReportDataNotFoundException("Monthly Report Error: Total person is null or zero for month of date " + date);
-        }
-        if (ticketCount == null || ticketCount == 0) {
-            throw new ReportDataNotFoundException("Monthly Report Error: Ticket quantity is null or zero for month of date " + date);
-        }
-        if (totalMaterialPrice == null || totalMaterialPrice == 0) {
-            throw new ReportDataNotFoundException("Monthly Report Error: Total amount is null or zero for month of date " + date);
-        }
-        Double personCost = totalMaterialPrice / totalPerson;
-        Double ticketCost = totalMaterialPrice / ticketCount;
-        int leftoverMealCount = totalPerson - ticketCount;
+        // Null değerleri 0 olarak kabul et
+        int safeTotalPerson = (totalPerson != null) ? totalPerson : 0;
+        int safeTicketCount = (ticketCount != null) ? ticketCount : 0;
+        double safeTotalMaterialPrice = (totalMaterialPrice != null) ? totalMaterialPrice : 0.0;
+        double safeTotalTicketPrice = (totalTicketPrice != null) ? totalTicketPrice : 0.0;
 
+        // Hesaplamalar - sıfıra bölme kontrolü
+        Double personCost = (safeTotalPerson > 0) ? safeTotalMaterialPrice / safeTotalPerson : 0.0;
+        Double ticketCost = (safeTicketCount > 0) ? safeTotalMaterialPrice / safeTicketCount : 0.0;
+        int leftoverMealCount = safeTotalPerson - safeTicketCount;
 
+        // Rapor oluştur ama veritabanına kaydetme
         Report report = new Report();
         report.setReportType(ReportType.MONTHLY);
-        report.setTicketQuantity(ticketCount);
-        report.setReportCreateDate(LocalDate.now().minusDays(1));
-        report.setTotalPersonQuantity(totalPerson);
-        report.setTotalMaterialPrice(totalMaterialPrice);
+        report.setTicketQuantity(safeTicketCount);
+        report.setReportCreateDate(date);
+        report.setTotalPersonQuantity(safeTotalPerson);
+        report.setTotalMaterialPrice(safeTotalMaterialPrice);
         report.setTotalCleanPrice(0.0);
         report.setLeftoverMealCount(leftoverMealCount);
         report.setAveragePersonCost(personCost);
         report.setAverageTicketCost(ticketCost);
-        report.setTotalTicketPrice(totalTicketPrice);
+        report.setTotalTicketPrice(safeTotalTicketPrice);
 
-        Report savedReport = reportRepository.save(report);
-
-
-        return mapToResponse(savedReport);
+        // Veritabanına kaydetmeden response döndür
+        return mapToResponse(report);
     }
 
     @Override
     public ReportResponse calculateYearlyReport(LocalDate date) {
+        // Yıllık rapor sadece hesaplanır, veritabanına kaydedilmez
+        // Frontend'de günlük raporlardan hesaplanacak
         Integer totalPerson = materialExitService.numberMealsInYear(date);
         Integer ticketCount = ticketSalesDetailService.getTicketCountByYear(date);
         Double totalMaterialPrice = materialExitService.getMaterialsByYear(date);
         Double totalTicketAmount = ticketSalesDetailService.getTicketAmountByYear(date);
 
-        if (totalPerson == null || totalPerson == 0) {
-            throw new ReportDataNotFoundException("Yearly Report Error: Total person is null or zero for year of date " + date);
-        }
-        if (ticketCount == null || ticketCount == 0) {
-            throw new ReportDataNotFoundException("Yearly Report Error: Ticket quantity is null or zero for year of date " + date);
-        }
-        if (totalMaterialPrice == null || totalMaterialPrice == 0) {
-            throw new ReportDataNotFoundException("Yearly Report Error: Total amount is null or zero for year of date " + date);
-        }
+        // Null değerleri 0 olarak kabul et
+        int safeTotalPerson = (totalPerson != null) ? totalPerson : 0;
+        int safeTicketCount = (ticketCount != null) ? ticketCount : 0;
+        double safeTotalMaterialPrice = (totalMaterialPrice != null) ? totalMaterialPrice : 0.0;
+        double safeTotalTicketAmount = (totalTicketAmount != null) ? totalTicketAmount : 0.0;
 
-        Double personCost = totalMaterialPrice / totalPerson;
-        Double ticketCost = totalMaterialPrice / ticketCount;
-        int leftoverMealCount = totalPerson - ticketCount;
+        // Hesaplamalar - sıfıra bölme kontrolü
+        Double personCost = (safeTotalPerson > 0) ? safeTotalMaterialPrice / safeTotalPerson : 0.0;
+        Double ticketCost = (safeTicketCount > 0) ? safeTotalMaterialPrice / safeTicketCount : 0.0;
+        int leftoverMealCount = safeTotalPerson - safeTicketCount;
 
-
+        // Rapor oluştur ama veritabanına kaydetme
         Report report = new Report();
         report.setReportType(ReportType.YEARLY);
-        report.setTicketQuantity(ticketCount);
-        report.setReportCreateDate(LocalDate.now());
-        report.setTotalPersonQuantity(totalPerson);
-        report.setTotalMaterialPrice(totalMaterialPrice);
+        report.setTicketQuantity(safeTicketCount);
+        report.setReportCreateDate(date);
+        report.setTotalPersonQuantity(safeTotalPerson);
+        report.setTotalMaterialPrice(safeTotalMaterialPrice);
         report.setTotalCleanPrice(0.0);
         report.setLeftoverMealCount(leftoverMealCount);
         report.setAveragePersonCost(personCost);
         report.setAverageTicketCost(ticketCost);
-        report.setTotalTicketPrice(totalTicketAmount);
+        report.setTotalTicketPrice(safeTotalTicketAmount);
 
-        Report savedReport = reportRepository.save(report);
-
-        return mapToResponse(savedReport);
+        // Veritabanına kaydetmeden response döndür
+        return mapToResponse(report);
     }
 
 
 
+    // Sadece günlük raporlar otomatik oluşturulur
     @Scheduled(cron = "0 0 1 * * *")  // Her gün 01:00'da çalışır
     public void generateDailyReport() {
         LocalDate reportDate = LocalDate.now().minusDays(1);  // Bir önceki günün tarihi
         try {
             calculateDailyReport(reportDate);
-
         } catch (ReportDataNotFoundException e) {
-            System.out.println("DAİLY report not generated: " + e.getMessage());
-
+            System.out.println("DAILY report not generated: " + e.getMessage());
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
-
-    // Her pazartesi saat 01:00'da çalışır (haftalık rapor)
-    @Scheduled(cron = "0 0 1 * * MON")
-    public void generateWeeklyReport() {
-        LocalDate reportDate = LocalDate.now().minusWeeks(1);
-        try {
-            calculateWeeklyReport(reportDate);
-
-        } catch (ReportDataNotFoundException e) {
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    // Her ayın son günü saat 01:00'da çalışır
-    @Scheduled(cron = "0 0 1 L * *")
-    public void generateMonthlyReport() {
-        LocalDate reportDate = LocalDate.now().minusMonths(1);
-        try {
-            calculateMonthlyReport(reportDate);
-
-        } catch (ReportDataNotFoundException e) {
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    // Her yılın 31 Aralık günü saat 01:00'da çalışır
-    @Scheduled(cron = "0 0 1 31 12 *")
-    public void generateYearlyReport() {
-        LocalDate reportDate = LocalDate.now();
-        try {
-            calculateYearlyReport(reportDate);
-
-        } catch (ReportDataNotFoundException e) {
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+    
+    // Haftalık, aylık ve yıllık raporlar frontend'de hesaplanacak, 
+    // bu yüzden scheduled task'lar kaldırıldı
 
 
 
 
     @Override
     public ReportResponse getReportByDate(LocalDate date,ReportType reportType){
-        return reportRepository.findByReportCreateDateAndReportType(date,reportType)
+        // Sadece günlük raporlar veritabanında tutulur
+        if (reportType != ReportType.DAILY) {
+            // Haftalık, aylık, yıllık raporlar frontend'de hesaplanacak
+            return null;
+        }
+        return reportRepository.findByReportCreateDateAndReportType(date, reportType)
                 .map(this::mapToResponse)
                 .orElse(null); // Rapor bulunamazsa null döndür
     }
     @Override
     public List<ReportResponse> getReportsBetweenDate(LocalDate startDate, LocalDate endDate){
-        List<Report> reports = reportRepository.findByReportCreateDateBetween(startDate,endDate);
+        // Sadece günlük raporları getir
+        List<Report> reports = reportRepository.findByReportCreateDateBetweenAndReportType(startDate, endDate, ReportType.DAILY);
         return mapToResponseList(reports);
     }
 
     private ReportResponse mapToResponse(Report report){
         ReportResponse response = new ReportResponse();
-        response.setId(report.getId());
+        // ID null olabilir (haftalık, aylık, yıllık raporlar veritabanına kaydedilmez)
+        if (report.getId() != null) {
+            response.setId(report.getId());
+        }
         response.setReportType(report.getReportType());
         response.setAveragePersonCost(report.getAveragePersonCost());
         response.setTicketQuantity(report.getTicketQuantity());
@@ -295,7 +273,6 @@ public class ReportServiceImpl implements ReportService {
         response.setTotalMaterialPrice(report.getTotalMaterialPrice());
         response.setTotalTicketPrice(report.getTotalTicketPrice());
         response.setLeftoverMealCount(report.getLeftoverMealCount());
-
 
         return response;
     }

@@ -8,7 +8,7 @@ public record MaterialDemandApprovedRequest (
         String description,
         LocalDate expiryDate,
         LocalDate entryDate,
-        Double quantity  // Onaylama sırasında değiştirilebilen miktar (opsiyonel)
-
+        Double quantity,  // Onaylama sırasında değiştirilebilen miktar (opsiyonel)
+        Long purchaseTypeId  // Alım türü (doğrudan temin için gerekli)
 ){
 }

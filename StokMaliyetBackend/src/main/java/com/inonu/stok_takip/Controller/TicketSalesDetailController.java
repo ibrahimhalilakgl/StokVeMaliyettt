@@ -74,6 +74,12 @@ public class TicketSalesDetailController {
         return new ResponseEntity<>(RestResponse.of(ticketSalesDetailResponseList), HttpStatus.OK);
     }
 
+    @DeleteMapping("/deleteByDate")
+    public ResponseEntity<RestResponse<String>> deleteTicketsByDate(@RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate date) {
+        ticketSalesDetailService.deleteTicketsByDate(date);
+        return new ResponseEntity<>(RestResponse.of("Seçilen tarih için tüm fiş kayıtları başarıyla silindi."), HttpStatus.OK);
+    }
+
 
 
 

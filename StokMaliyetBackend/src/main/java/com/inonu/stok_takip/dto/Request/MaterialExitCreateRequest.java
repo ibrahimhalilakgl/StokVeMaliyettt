@@ -6,7 +6,6 @@ import java.util.Map;
 public record MaterialExitCreateRequest(
     Map<Long,Double> productQuantities,
     String recipient,
-    int totalPerson,
     LocalDate exitDate,
     String description
 ) {

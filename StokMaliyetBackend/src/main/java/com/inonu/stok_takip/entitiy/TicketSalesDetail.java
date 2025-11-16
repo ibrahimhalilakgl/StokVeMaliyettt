@@ -13,6 +13,7 @@ public class TicketSalesDetail extends BaseEntity{
     private int quantity; // satılan fiş sayısı
     private Double totalPrice; // satılan fişlerin toplam tutarı
     private LocalDate ticketDate; // fişlerin satıldığı gün
+    private Integer totalPerson; // o gün için kaç kişilik yemek yapıldığı
 
     @ManyToOne
     @JoinColumn(name = "ticketType_id",nullable = false)
@@ -47,5 +48,13 @@ public class TicketSalesDetail extends BaseEntity{
 
     public void setTotalPrice(Double totalPrice) {
         this.totalPrice = totalPrice;
+    }
+
+    public Integer getTotalPerson() {
+        return totalPerson;
+    }
+
+    public void setTotalPerson(Integer totalPerson) {
+        this.totalPerson = totalPerson;
     }
 }

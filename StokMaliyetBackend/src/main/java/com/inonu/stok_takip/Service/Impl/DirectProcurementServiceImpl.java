@@ -6,11 +6,8 @@ import com.inonu.stok_takip.Exception.DirectProcurement.DirectProcurementNotFoun
 import com.inonu.stok_takip.Repositoriy.DirectProcurementRepository;
 import com.inonu.stok_takip.Service.*;
 import com.inonu.stok_takip.dto.Request.DirectProcurementCreateRequest;
-import com.inonu.stok_takip.dto.Request.MaterialEntryCreateRequest;
 import com.inonu.stok_takip.dto.Response.DirectProcurementResponse;
 import com.inonu.stok_takip.entitiy.*;
-import com.inonu.stok_takip.Enum.EntrySourceType;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,23 +21,14 @@ public class DirectProcurementServiceImpl implements DirectProcurementService {
 
     private final DirectProcurementRepository directProcurementRepository;
     private final PurchasedUnitService purchasedUnitService;
-    private final PurchaseTypeService purchaseTypeService;
     private final ProductService productService;
-    private final MaterialEntryService materialEntryService;
-    private final BudgetService budgetService; // kept for side-effects in create flow
 
     public DirectProcurementServiceImpl(DirectProcurementRepository directProcurementRepository,
                                         PurchasedUnitService purchasedUnitService,
-                                        PurchaseTypeService purchaseTypeService, 
-                                        ProductService productService,
-                                        @Lazy MaterialEntryService materialEntryService,
-                                        BudgetService budgetService) {
+                                        ProductService productService) {
         this.directProcurementRepository = directProcurementRepository;
         this.purchasedUnitService = purchasedUnitService;
-        this.purchaseTypeService = purchaseTypeService;
         this.productService = productService;
-        this.materialEntryService = materialEntryService;
-        this.budgetService = budgetService;
     }
 
 
@@ -48,7 +36,6 @@ public class DirectProcurementServiceImpl implements DirectProcurementService {
     @Transactional
     public DirectProcurementResponse createDirectProcurement(DirectProcurementCreateRequest request) {
 
-        PurchaseType purchaseType = purchaseTypeService.getPurchaseTypeById(request.purchaseTypeId());
         PurchasedUnit purchasedUnit = purchasedUnitService.getPurchasedUnitById(request.purchaseUnitId());
         Product product = productService.getProductById(request.productId());
 
@@ -57,45 +44,16 @@ public class DirectProcurementServiceImpl implements DirectProcurementService {
         directProcurement.setTotalAmount(totalAmount);
         directProcurement.setPurchasedUnit(purchasedUnit);
         directProcurement.setProduct(product);
-        directProcurement.setPurchaseType(purchaseType);
+        directProcurement.setPurchaseType(null); // Alım türü haftalık talep formunda belirlenecek
         directProcurement.setRemainingQuantity(request.quantity());
         directProcurement.setTenderType(TenderType.DIRECT_PROCUREMENT);
 
         DirectProcurement saved = directProcurementRepository.save(directProcurement);
 
-        // Doğrudan temin oluşturulduğunda otomatik olarak malzeme girişi yap
-        createMaterialEntryFromDirectProcurement(saved, request);
+        // Doğrudan temin oluşturulduğunda otomatik malzeme girişi yapılmaz
+        // Ürün haftalık talep formunda onaylandıktan sonra stoğa eklenecek (ihale gibi)
 
         return mapToResponse(saved);
-    }
-
-    private void createMaterialEntryFromDirectProcurement(DirectProcurement directProcurement, DirectProcurementCreateRequest request) {
-        try {
-            // Varsayılan bütçe ID'si (1) - gerçek uygulamada request'ten gelecek
-            Long defaultBudgetId = 1L;
-            
-            MaterialEntryCreateRequest materialEntryRequest = new MaterialEntryCreateRequest(
-                directProcurement.getQuantity(),
-                directProcurement.getUnitPrice(),
-                request.entryDate() != null ? request.entryDate() : LocalDate.now(),
-                request.expiryDate(),
-                directProcurement.getCompanyName(),
-                "Doğrudan temin ile malzeme girişi",
-                directProcurement.getProduct().getId(),
-                defaultBudgetId,
-                EntrySourceType.DOGRUDAN_TEMIN,
-                directProcurement.getPurchasedUnit().getId(),
-                directProcurement.getPurchaseType().getId(),
-                null, // tenderId
-                directProcurement.getId(), // directProcurementId
-                TenderType.DIRECT_PROCUREMENT
-            );
-
-            materialEntryService.createMaterialEntry(materialEntryRequest);
-        } catch (Exception e) {
-            System.err.println("Doğrudan temin malzeme girişi oluşturulurken hata: " + e.getMessage());
-            // Hata durumunda işlemi durdurma, sadece logla
-        }
     }
 
     @Override
@@ -151,7 +109,11 @@ public class DirectProcurementServiceImpl implements DirectProcurementService {
         List<DirectProcurement> directProcurements = directProcurementRepository.findAll();
 
         for (DirectProcurement directProcurement : directProcurements) {
-            boolean isExpired = directProcurement.getEndDate().isBefore(today);
+            // endDate null kontrolü
+            boolean isExpired = false;
+            if (directProcurement.getEndDate() != null) {
+                isExpired = directProcurement.getEndDate().isBefore(today);
+            }
 
             // Eğer ihale süresi dolmuşsa veya yılın son günündeysek
             if ((isExpired || isYearEnd) && directProcurement.isActive()) {
@@ -230,7 +192,7 @@ public class DirectProcurementServiceImpl implements DirectProcurementService {
                 directProcurement.getProduct().getName(),
                 directProcurement.getProduct().getMeasurementType().getName(),
                 directProcurement.getPurchasedUnit().getName(),
-                directProcurement.getPurchaseType().getName(),
+                directProcurement.getPurchaseType() != null ? directProcurement.getPurchaseType().getName() : null,
                 directProcurement.getTenderType().getDescription()
         );
         return directProcurementResponse;

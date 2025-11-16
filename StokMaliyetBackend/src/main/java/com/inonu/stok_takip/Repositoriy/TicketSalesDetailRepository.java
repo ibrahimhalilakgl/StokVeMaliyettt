@@ -3,8 +3,10 @@ package com.inonu.stok_takip.Repositoriy;
 
 import com.inonu.stok_takip.entitiy.TicketSalesDetail;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -55,6 +57,19 @@ public interface TicketSalesDetailRepository extends JpaRepository<TicketSalesDe
 
     @Query("SELECT SUM(t.totalPrice) FROM TicketSalesDetail t WHERE EXTRACT(YEAR FROM t.ticketDate) = EXTRACT(YEAR FROM CAST(:date AS DATE))")
     Double findTotalTicketSalesAmountByYear(@Param("date") LocalDate date);
+
+    // Belirli bir tarih için tüm fiş kayıtlarını getir
+    List<TicketSalesDetail> findByTicketDate(LocalDate ticketDate);
+
+    // Belirli bir tarih için tüm fiş kayıtlarını sil
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM TicketSalesDetail t WHERE t.ticketDate = :ticketDate")
+    void deleteByTicketDate(@Param("ticketDate") LocalDate ticketDate);
+
+    // Belirli bir tarih için kaç kişilik yemek yapıldığını getir (MAX kullanarak aynı gün için aynı değeri döndürür)
+    @Query("SELECT MAX(t.totalPerson) FROM TicketSalesDetail t WHERE t.ticketDate = :ticketDate AND t.totalPerson IS NOT NULL")
+    Integer findTotalPersonByDate(@Param("ticketDate") LocalDate ticketDate);
 
 
 

@@ -1,6 +1,7 @@
 package com.inonu.stok_takip.dto.Response;
 
 import com.inonu.stok_takip.Enum.DemandStatus;
+import com.inonu.stok_takip.Enum.TenderType;
 
 import java.time.LocalDate;
 
@@ -15,6 +16,7 @@ public class MaterialDemandResponse {
     private String rejectionReason;
     private Long productId;
     private DemandStatus demandStatus;
+    private TenderType tenderType; // İhale mi doğrudan temin mi olduğunu belirtir
 
     public MaterialDemandResponse() {
     }
@@ -112,5 +114,13 @@ public class MaterialDemandResponse {
 
     public void setProductName(String productName) {
         this.productName = productName;
+    }
+
+    public TenderType getTenderType() {
+        return tenderType;
+    }
+
+    public void setTenderType(TenderType tenderType) {
+        this.tenderType = tenderType;
     }
 }

@@ -11,9 +11,6 @@ public record DirectProcurementCreateRequest(
         LocalDate endDate,
         Double unitPrice,
         String companyName,
-        Long purchaseUnitId,
-        Long purchaseTypeId,
-        LocalDate entryDate,
-        LocalDate expiryDate
+        Long purchaseUnitId
 ) {
 }

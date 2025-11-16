@@ -13,16 +13,12 @@ const MaterialEntry: React.FC = () => {
     endDate: '',
     companyName: '',
     productId: '',
-    purchaseUnitId: '',
-    purchaseTypeId: '',
-    entryDate: '',
-    expiryDate: ''
+    purchaseUnitId: ''
   });
 
   const [materials, setMaterials] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [purchaseUnits, setPurchaseUnits] = useState<any[]>([]);
-  const [purchaseTypes, setPurchaseTypes] = useState<any[]>([]);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showError, setShowError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -30,15 +26,13 @@ const MaterialEntry: React.FC = () => {
   useEffect(() => {
     const fetchOptions = async () => {
       try {
-        const [productRes, unitRes, typeRes] = await Promise.all([
+        const [productRes, unitRes] = await Promise.all([
           axios.get('/v1/product/all'),
           axios.get('/v1/purchasedUnit/all'),
-          axios.get('/v1/purchaseType/all'),
         ]);
 
         setProducts(productRes.data.data || []);
         setPurchaseUnits(unitRes.data.data || []);
-        setPurchaseTypes(typeRes.data.data || []);
       } catch (err) {
         console.error('Dropdown verileri alınamadı:', err);
       }
@@ -61,10 +55,7 @@ const MaterialEntry: React.FC = () => {
       endDate: '',
       companyName: '',
       productId: '',
-      purchaseUnitId: '',
-      purchaseTypeId: '',
-      entryDate: '',
-      expiryDate: ''
+      purchaseUnitId: ''
     });
   };
 
@@ -110,21 +101,6 @@ const MaterialEntry: React.FC = () => {
         </Grid>
 
       
-
-        <Grid item xs={6}>
-          <FormControl fullWidth required>
-            <InputLabel>Alım Türü</InputLabel>
-            <Select
-              value={formData.purchaseTypeId}
-              onChange={(e) => handleInputChange('purchaseTypeId', e.target.value)}
-              label="Alım Türü"
-            >
-              {purchaseTypes.map((t: any) => (
-                <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Grid>
 
         <Grid item xs={6}>
           <FormControl fullWidth required>
@@ -197,29 +173,6 @@ const MaterialEntry: React.FC = () => {
             fullWidth
             value={formData.companyName}
             onChange={(e) => handleInputChange('companyName', e.target.value)}
-          />
-        </Grid>
-
-        <Grid item xs={6}>
-          <TextField
-            label="Giriş Tarihi"
-            fullWidth
-            required
-            type="date"
-            InputLabelProps={{ shrink: true }}
-            value={formData.entryDate}
-            onChange={(e) => handleInputChange('entryDate', e.target.value)}
-          />
-        </Grid>
-
-        <Grid item xs={6}>
-          <TextField
-            label="Son Kullanma Tarihi"
-            fullWidth
-            type="date"
-            InputLabelProps={{ shrink: true }}
-            value={formData.expiryDate}
-            onChange={(e) => handleInputChange('expiryDate', e.target.value)}
           />
         </Grid>
 

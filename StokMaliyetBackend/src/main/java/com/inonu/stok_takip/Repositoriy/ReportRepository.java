@@ -11,4 +11,6 @@ import java.util.Optional;
 public interface ReportRepository extends JpaRepository<Report, Long> {
     Optional<Report> findByReportCreateDateAndReportType(LocalDate reportCreateDate, ReportType reportType);
     List<Report> findByReportCreateDateBetween(LocalDate startDate, LocalDate endDate);
+    List<Report> findByReportType(ReportType reportType);
+    List<Report> findByReportCreateDateBetweenAndReportType(LocalDate startDate, LocalDate endDate, ReportType reportType);
 }

@@ -14,6 +14,7 @@ const TicketForm: React.FC = () => {
   const [ticketMap, setTicketMap] = useState<{ [key: number]: number }>({});
   const [ticketTypes, setTicketTypes] = useState<TicketType[]>([]);
   const [ticketInputs, setTicketInputs] = useState<{ [key: number]: string }>({});
+  const [totalPerson, setTotalPerson] = useState<string>('');
   const [showMessage, setShowMessage] = useState(false);
   const [messageText, setMessageText] = useState('');
   const [messageType, setMessageType] = useState<'success' | 'error' | 'warning' | 'info'>('success');
@@ -65,13 +66,23 @@ const handleQuantityChange = (ticketTypeId: number, value: string) => {
 
   const handleSubmit = async () => {
     if (!ticketDate) {
-      console.log('Tarih seçilmelidir.');
+      setMessageText('Lütfen bir tarih seçin.');
+      setMessageType('warning');
+      setShowMessage(true);
+      return;
+    }
+
+    if (!totalPerson || parseInt(totalPerson) <= 0) {
+      setMessageText('Kaç kişilik yemek yapıldığı girilmelidir.');
+      setMessageType('error');
+      setShowMessage(true);
       return;
     }
 
     const requestBody = {
       ticketMap,
       ticketDate,
+      totalPerson: parseInt(totalPerson),
     };
 
     try {
@@ -81,10 +92,40 @@ const handleQuantityChange = (ticketTypeId: number, value: string) => {
       setMessageType('success');
       setShowMessage(true);
       setTicketMap({});
+      setTicketInputs({});
+      setTotalPerson('');
       setTicketDate(new Date().toISOString().slice(0, 10));
     } catch (error: any) {
       console.error('Sunucu hatası:', error);
       setMessageText('Fiş kaydedilemedi: ' + (error.response?.data?.data || 'Sunucu hatası'));
+      setMessageType('error');
+      setShowMessage(true);
+    }
+  };
+
+  const handleResetByDate = async () => {
+    if (!ticketDate) {
+      setMessageText('Lütfen bir tarih seçin.');
+      setMessageType('warning');
+      setShowMessage(true);
+      return;
+    }
+
+    if (!window.confirm(`Seçilen tarih (${ticketDate}) için tüm fiş kayıtları silinecek. Emin misiniz?`)) {
+      return;
+    }
+
+    try {
+      await axios.delete(`/v1/ticketSalesDetail/deleteByDate?date=${ticketDate}`);
+      setMessageText('Seçilen tarih için tüm fiş kayıtları başarıyla silindi.');
+      setMessageType('success');
+      setShowMessage(true);
+      setTicketMap({});
+      setTicketInputs({});
+      setTotalPerson('');
+    } catch (error: any) {
+      console.error('Sunucu hatası:', error);
+      setMessageText('Fiş kayıtları silinemedi: ' + (error.response?.data?.data || 'Sunucu hatası'));
       setMessageType('error');
       setShowMessage(true);
     }
@@ -107,6 +148,41 @@ const handleQuantityChange = (ticketTypeId: number, value: string) => {
           sx={{ mb: 3 }}
         />
 
+        <Box sx={{ 
+          mb: 3, 
+          p: 2, 
+          bgcolor: '#e3f2fd', 
+          borderRadius: 2, 
+          border: '2px solid #2196f3',
+          borderStyle: 'dashed'
+        }}>
+          <TextField
+            label="Kaç Kişilik Yemek Yapıldığı"
+            type="number"
+            value={totalPerson}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value === '' || /^\d+$/.test(value)) {
+                setTotalPerson(value);
+              }
+            }}
+            required
+            fullWidth
+            InputProps={{ inputProps: { min: 1 } }}
+            sx={{ 
+              '& .MuiOutlinedInput-root': {
+                bgcolor: 'white',
+                '&:hover fieldset': {
+                  borderColor: '#2196f3',
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: '#2196f3',
+                },
+              },
+            }}
+          />
+        </Box>
+
         {ticketTypes.map((type) => (
           <Box key={type.id} sx={{ mb: 2 }}>
             <Typography>{type.name} - {type.unitPrice}₺</Typography>
@@ -121,9 +197,14 @@ const handleQuantityChange = (ticketTypeId: number, value: string) => {
           </Box>
         ))}
 
-        <Button variant="contained" color="primary" sx={{ mt: 2 }} onClick={handleSubmit}>
-          Kaydet
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+          <Button variant="contained" color="primary" onClick={handleSubmit}>
+            Kaydet
+          </Button>
+          <Button variant="outlined" color="error" onClick={handleResetByDate}>
+            Seçilen Günü Sıfırla
+          </Button>
+        </Box>
       </Box>
       
       <SuccessMessage

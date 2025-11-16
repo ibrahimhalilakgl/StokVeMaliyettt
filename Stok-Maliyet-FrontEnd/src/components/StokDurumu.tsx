@@ -15,9 +15,11 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
-  LinearProgress
+  LinearProgress,
+  Alert
 } from '@mui/material';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import WarningIcon from '@mui/icons-material/Warning';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { useNavigate } from 'react-router-dom';
@@ -222,6 +224,14 @@ const StokDurumu: React.FC = () => {
     }
   };
 
+  // Kritik seviye kontrolü - depoda kalan miktar ile kritik seviye karşılaştırması
+  // Yüzdelik hesaplama: (Depoda Kalan / Kritik Seviye) * 100
+  const criticalItems = stoklar.filter(stok => {
+    if (stok.kritikSeviye <= 0) return false;
+    const yuzde = (stok.remaining / stok.kritikSeviye) * 100;
+    return yuzde < 100; // %100'ün altındakiler kritik
+  });
+
   if (loading) {
     return (
       <Box sx={{ p: 3 }}>
@@ -300,6 +310,34 @@ const StokDurumu: React.FC = () => {
         </Box>
       </Box>
 
+      {/* Kritik Stok Uyarısı */}
+      {criticalItems.length > 0 && (
+        <Box mb={2}>
+          <Alert 
+            severity="error" 
+            icon={<WarningIcon />}
+            sx={{ mb: 1 }}
+          >
+            <strong>{criticalItems.length}</strong> malzeme kritik seviyenin altında bulunmaktadır!
+            <Box component="ul" sx={{ mt: 1, mb: 0, pl: 3 }}>
+              {criticalItems.map((item) => {
+                const yuzde = item.kritikSeviye > 0 ? (item.remaining / item.kritikSeviye) * 100 : 0;
+                const eksik = item.kritikSeviye - item.remaining;
+                return (
+                  <li key={item.id}>
+                    <strong>{item.malzemeAdi}</strong>: Depoda Kalan: {item.remaining} {item.birim}, 
+                    Kritik Seviye: {item.kritikSeviye} {item.birim}
+                    <span style={{ color: '#d32f2f', fontWeight: 'bold' }}>
+                      {' '}(%{yuzde.toFixed(1)} - Eksik: {eksik} {item.birim})
+                    </span>
+                  </li>
+                );
+              })}
+            </Box>
+          </Alert>
+        </Box>
+      )}
+
       <TableContainer 
         component={Paper} 
         sx={{ 
@@ -341,7 +379,6 @@ const StokDurumu: React.FC = () => {
               <TableCell align="right">Önceki Yıldan Devir ile Depoya Giren</TableCell>
               <TableCell align="right">22D ile Doğrudan Temin ile Depoya Giren</TableCell>
               <TableCell align="right">19.Madde Açık İhale ile Depoya Giren</TableCell>
-              <TableCell align="right">İhale İle Alınan Toplam Miktar</TableCell>
               <TableCell align="right">Toplam Alınan Miktar</TableCell>
               <TableCell align="right">Toplam Çıkış</TableCell>
               <TableCell align="right">Depoda Kalan Miktar</TableCell>
@@ -351,7 +388,7 @@ const StokDurumu: React.FC = () => {
           <TableBody>
             {stoklar.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={13} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={12} align="center" sx={{ py: 4 }}>
                   <Box sx={{ textAlign: 'center' }}>
                     <Typography variant="h6" color="text.secondary" gutterBottom>
                       Henüz stok verisi bulunmuyor
@@ -364,14 +401,45 @@ const StokDurumu: React.FC = () => {
               </TableRow>
             ) : (
               stoklar.map((stok, index) => {
-                const stokYuzdesi = stok.kritikSeviye > 0 ? (stok.remaining / stok.kritikSeviye) * 100 : 0;
-                const stokDurumu = stokYuzdesi <= 50 ? 'Kritik' : stokYuzdesi <= 100 ? 'Düşük' : 'Normal';
+                // Yüzdelik hesaplama: (Depoda Kalan / Kritik Seviye) * 100
+                // %100 = Kritik Seviyeye Eşit
+                // %100'ün altı = Kritik (Kırmızı)
+                // %100'ün üstü = Normal (Yeşil)
+                
+                // Kritik seviye 0 veya undefined ise yüzde hesaplanamaz
+                if (!stok.kritikSeviye || stok.kritikSeviye <= 0) {
+                  return (
+                    <TableRow key={stok.id}>
+                      <TableCell colSpan={12} align="center">
+                        <Typography variant="body2" color="text.secondary">
+                          {stok.malzemeAdi} için kritik seviye tanımlı değil
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  );
+                }
+                
+                // Yüzdelik hesaplama: (Depoda Kalan / Kritik Seviye) * 100
+                // Debug: Değerleri kontrol et
+                console.log(`${stok.malzemeAdi}: Remaining=${stok.remaining}, KritikSeviye=${stok.kritikSeviye}`);
+                
+                const stokYuzdesi = (stok.remaining / stok.kritikSeviye) * 100;
+                const isCritical = stokYuzdesi < 100; // %100'ün altındakiler kritik
+                
+                console.log(`${stok.malzemeAdi}: Yüzde=${stokYuzdesi.toFixed(1)}%, Kritik=${isCritical}`);
+                
+                // Progress bar için değer: %100'den fazla olsa bile maksimum 100 göster
+                // Ama yüzde değeri gerçek değeri gösterir
+                const progressBarValue = Math.min(stokYuzdesi, 100);
                 
                 return (
                   <TableRow 
                     key={stok.id}
                     sx={{
-                      backgroundColor: stok.remaining <= stok.kritikSeviye ? '#fff3e0' : 'inherit'
+                      backgroundColor: isCritical ? '#ffebee' : 'inherit',
+                      '&:hover': {
+                        backgroundColor: isCritical ? '#ffcdd2' : '#f5f5f5'
+                      }
                     }}
                   >
                     <TableCell padding="checkbox">
@@ -387,28 +455,39 @@ const StokDurumu: React.FC = () => {
                     <TableCell align="right">{stok.carryOver}</TableCell>
                     <TableCell align="right">{stok.directProcurement}</TableCell>
                     <TableCell align="right">{stok.tender}</TableCell>
-                    <TableCell align="right">{stok.tender}</TableCell>
                     <TableCell align="right">{stok.totalReceived}</TableCell>
                     <TableCell align="right">{stok.totalExit}</TableCell>
-                    <TableCell align="right">{stok.remaining}</TableCell>
+                    <TableCell align="right">
+                      <Typography variant="body2" sx={{ 
+                        color: isCritical ? '#d32f2f' : 'inherit',
+                        fontWeight: isCritical ? 700 : 400
+                      }}>
+                        {stok.remaining}
+                      </Typography>
+                    </TableCell>
                     <TableCell align="center">
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography variant="body2" sx={{ 
-                          color: stokYuzdesi <= 50 ? '#d32f2f' : stokYuzdesi <= 100 ? '#f57c00' : '#2e7d32',
-                          fontWeight: 600
-                        }}>
-                          {stokYuzdesi.toFixed(0)}%
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'center' }}>
+                        <Typography 
+                          variant="body2" 
+                          sx={{ 
+                            color: isCritical ? '#d32f2f' : '#2e7d32',
+                            fontWeight: 600,
+                            minWidth: '45px',
+                            textAlign: 'right'
+                          }}
+                        >
+                          {stokYuzdesi.toFixed(1)}%
                         </Typography>
                         <LinearProgress 
                           variant="determinate" 
-                          value={Math.min(stokYuzdesi, 100)} 
+                          value={progressBarValue}
                           sx={{ 
-                            width: 60, 
+                            width: 80, 
                             height: 8,
                             borderRadius: 4,
                             backgroundColor: '#e0e0e0',
                             '& .MuiLinearProgress-bar': {
-                              backgroundColor: stokYuzdesi <= 50 ? '#d32f2f' : stokYuzdesi <= 100 ? '#f57c00' : '#2e7d32',
+                              backgroundColor: isCritical ? '#d32f2f' : '#2e7d32',
                               borderRadius: 4
                             }
                           }} 

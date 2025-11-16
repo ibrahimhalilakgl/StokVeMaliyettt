@@ -6,7 +6,8 @@ import java.util.Map;
 public record TicketSalesDetailCreateRequest(
     //Deneme Amaclı
     Map<Long, Integer> ticketMap,
-    LocalDate ticketDate
+    LocalDate ticketDate,
+    Integer totalPerson // o gün için kaç kişilik yemek yapıldığı
 ) {
     
 }

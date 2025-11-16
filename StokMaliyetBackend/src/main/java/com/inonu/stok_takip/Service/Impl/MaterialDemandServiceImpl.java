@@ -149,7 +149,7 @@ public class MaterialDemandServiceImpl implements MaterialDemandService {
                     approvedQuantity, demand.getDirectProcurement().getUnitPrice(),request.entryDate(),request.expiryDate(),
                     demand.getCompanyName(), request.description(), demand.getDirectProcurement().getProduct().getId(),
                     request.budgetId(), EntrySourceType.DOGRUDAN_TEMIN,demand.getDirectProcurement().getPurchasedUnit().getId(),
-                    demand.getDirectProcurement().getPurchaseType().getId(),null,demand.getDirectProcurement().getId(),
+                    request.purchaseTypeId(),null,demand.getDirectProcurement().getId(),
                     demand.getTenderType());
 
 
@@ -243,6 +243,7 @@ public class MaterialDemandServiceImpl implements MaterialDemandService {
         materialDemandResponse.setProductId(materialDemand.getProduct().getId());
         materialDemandResponse.setDemandStatus(materialDemand.getStatus());
         materialDemandResponse.setRejectionReason(materialDemand.getRejectionReason());
+        materialDemandResponse.setTenderType(materialDemand.getTenderType());
 
         return materialDemandResponse;
     }

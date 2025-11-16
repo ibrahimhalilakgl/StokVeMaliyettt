@@ -95,7 +95,11 @@ public class TenderServiceImpl implements TenderService {
         List<Tender> tenders = tenderRepository.findAll();
 
         for (Tender tender : tenders) {
-            boolean isExpired = tender.getEndDate().isBefore(today);
+            // endDate null kontrolü
+            boolean isExpired = false;
+            if (tender.getEndDate() != null) {
+                isExpired = tender.getEndDate().isBefore(today);
+            }
 
             // Eğer ihale süresi dolmuşsa veya yılın son günündeysek
             if ((isExpired || isYearEnd) && tender.isActive()) {

@@ -29,4 +29,10 @@ public interface TicketSalesDetailService {
     Double getTicketAmountByMonth(LocalDate monthDate);
     Double getTicketAmountByYear(LocalDate yearDate);
 
+    // Belirli bir tarih için tüm fiş kayıtlarını sil
+    void deleteTicketsByDate(LocalDate ticketDate);
+
+    // Belirli bir tarih için kaç kişilik yemek yapıldığını getir
+    Integer getTotalPersonByDay(LocalDate dayDate);
+
 }

@@ -17,9 +17,7 @@ import {
   FormControl,
   InputLabel,
   Select,
-  Chip,
 } from "@mui/material";
-import WarningIcon from "@mui/icons-material/Warning";
 import SearchIcon from "@mui/icons-material/Search";
 import axios from "axios";
 import dayjs from "dayjs";
@@ -51,7 +49,7 @@ const MaterialList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [materials, setMaterials] = useState<Material[]>([]);
   const [page, setPage] = useState(0);
-  const rowsPerPage = 10;
+  const [rowsPerPage, setRowsPerPage] = useState(50);
   const [categoryFilter, setCategoryFilter] = useState("");
   const [unitFilter, setUnitFilter] = useState("");
 
@@ -96,7 +94,7 @@ const MaterialList: React.FC = () => {
   const sortedMaterials = [...filteredMaterials].sort((a, b) => {
     const daysA = calculateDaysToExpiry(a.expiryDate);
     const daysB = calculateDaysToExpiry(b.expiryDate);
-
+    
     // 1. Süresi geçmişler öne
     if (daysA < 0 && daysB >= 0) return -1;
     if (daysB < 0 && daysA >= 0) return 1;
@@ -129,29 +127,14 @@ const MaterialList: React.FC = () => {
     (mat) => calculateDaysToExpiry(mat.expiryDate) < 0
   ).length;
 
-  // Kritik seviye kontrolü - her bir malzeme girişi için quantity ile criticalLevel karşılaştırması
-  const criticalLevelCount = filteredMaterials.filter((mat) => {
-    const criticalLevel = mat.productResponse?.criticalLevel || 0;
-    return mat.quantity <= criticalLevel;
-  }).length;
-
   return (
     <Box p={2}>
       <Typography variant="h4" gutterBottom>
         Malzeme Listesi
       </Typography>
 
-      {(nearExpiryCount > 0 || expiredCount > 0 || criticalLevelCount > 0) && (
+      {(nearExpiryCount > 0 || expiredCount > 0) && (
         <Box mb={2}>
-          {criticalLevelCount > 0 && (
-            <Alert 
-              severity="error" 
-              icon={<WarningIcon />}
-              sx={{ mb: 1 }}
-            >
-              <strong>{criticalLevelCount}</strong> malzeme kritik seviyenin altında bulunmaktadır!
-            </Alert>
-          )}
           {expiredCount > 0 && (
             <Alert severity="error" sx={{ mb: 1 }}>
               {expiredCount} malzemenin son kullanma tarihi geçmiştir!
@@ -251,25 +234,17 @@ const MaterialList: React.FC = () => {
               const daysToExpiry = calculateDaysToExpiry(material.expiryDate);
               const isExpired = daysToExpiry < 0;
               const isNearExpiry = daysToExpiry >= 0 && daysToExpiry <= 10;
-              
-              // Kritik seviye kontrolü
-              const criticalLevel = material.productResponse?.criticalLevel || 0;
-              const isCritical = material.quantity <= criticalLevel;
 
-              // Öncelik sırası: Kritik > Süresi Geçmiş > Yaklaşan > Normal
+              // Öncelik sırası: Süresi Geçmiş > Yaklaşan > Normal
               const rowStyle = {
-                backgroundColor: isCritical
-                  ? "#ffcdd2"
-                  : isExpired
+                backgroundColor: isExpired
                   ? "#ffebee"
                   : isNearExpiry
                   ? "#fff8e1"
                   : "inherit",
               };
 
-              const textColor = isCritical 
-                ? "#c62828" 
-                : isExpired 
+              const textColor = isExpired 
                 ? "red" 
                 : isNearExpiry 
                 ? "#f57c00" 
@@ -286,28 +261,8 @@ const MaterialList: React.FC = () => {
                   <TableCell style={{ textAlign: "center", fontSize: "15px" }}>
                     {material.productResponse.category}
                   </TableCell>
-                  <TableCell 
-                    style={{ 
-                      textAlign: "center", 
-                      fontSize: "15px",
-                      color: isCritical ? "#c62828" : "inherit",
-                      fontWeight: isCritical ? "bold" : "normal"
-                    }}
-                  >
+                  <TableCell style={{ textAlign: "center", fontSize: "15px" }}>
                     {formatNumber(material.quantity)}
-                    {isCritical && (
-                      <Typography 
-                        variant="caption" 
-                        display="block" 
-                        sx={{ 
-                          color: "#c62828",
-                          fontSize: "0.7rem",
-                          mt: 0.5
-                        }}
-                      >
-                        (Kritik: {material.productResponse.criticalLevel})
-                      </Typography>
-                    )}
                   </TableCell>
                   <TableCell style={{ textAlign: "center", fontSize: "15px" }}>
                     {material.productResponse.measurementType}
@@ -322,24 +277,7 @@ const MaterialList: React.FC = () => {
                     {formatNumber(material.totalPriceIncludingVat)}
                   </TableCell>
                   <TableCell style={{ textAlign: "center", fontSize: "15px" }}>
-                    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5 }}>
-                      <Typography variant="body2">
-                        {material.productResponse.criticalLevel}
-                      </Typography>
-                      {isCritical && (
-                        <Chip
-                          label="KRİTİK"
-                          size="small"
-                          color="error"
-                          icon={<WarningIcon />}
-                          sx={{ 
-                            fontSize: "0.7rem",
-                            height: "20px",
-                            fontWeight: "bold"
-                          }}
-                        />
-                      )}
-                    </Box>
+                    {material.productResponse.criticalLevel}
                   </TableCell>
                   <TableCell
                     style={{
@@ -371,7 +309,11 @@ const MaterialList: React.FC = () => {
           page={page}
           onPageChange={(_, newPage) => setPage(newPage)}
           rowsPerPage={rowsPerPage}
-          rowsPerPageOptions={[10]}
+          onRowsPerPageChange={(e) => {
+            setRowsPerPage(parseInt(e.target.value, 10));
+            setPage(0);
+          }}
+          rowsPerPageOptions={[10, 25, 50, 100]}
         />
       </Box>
     </Box>
